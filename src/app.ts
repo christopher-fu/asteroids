@@ -1,5 +1,6 @@
 import { Scene, PerspectiveCamera, WebGLRenderer, Mesh, SphereGeometry,
-         MeshLambertMaterial, PointLight, BoxGeometry } from 'three';
+         MeshLambertMaterial, PointLight, BoxGeometry, Vector3 } from 'three';
+import Stats = require('stats.js');
 
 class App {
   private canvas: HTMLCanvasElement;
@@ -7,11 +8,14 @@ class App {
   private camera: PerspectiveCamera;
   private viewAngle: number = 45;
   private aspect: number;
-  private readonly WIDTH = 1024;
-  private readonly HEIGHT = 768;
   private scene: Scene;
   private cube: Mesh;
   private isKeyDown: { [key: number]: boolean };
+  private velocity: Vector3;
+  private stats: Stats;
+
+  private readonly WIDTH = 1024;
+  private readonly HEIGHT = 768;
 
   private readonly KEY_W = 87;
   private readonly KEY_A = 65;
@@ -19,6 +23,10 @@ class App {
   private readonly KEY_D = 68;
   private readonly KEY_Q = 81;
   private readonly KEY_E = 69;
+  private readonly KEY_SPC = 32;
+  private readonly KEY_LSHIFT = 16;
+
+  private readonly MAX_VELOCITY = 1;
 
   constructor(container: HTMLElement) {
     this.aspect = this.WIDTH / this.HEIGHT;
@@ -31,6 +39,11 @@ class App {
     container.appendChild(this.renderer.domElement);
 
     this.isKeyDown = {};
+    this.velocity = new Vector3(0, 0, 0);
+
+    this.stats = new Stats();
+    this.stats.showPanel(0);
+    document.body.appendChild(this.stats.dom);
 
     // Set up keyboard controls
     document.onkeydown = (ev) => {
@@ -67,8 +80,7 @@ class App {
     this.scene.add(pointLight);
   }
 
-  private draw() {
-    this.renderer.render(this.scene, this.camera);
+  private updateCameraRotation() {
     if (this.isKeyDown[this.KEY_W]) {
       this.camera.rotation.x += 0.01;
     }
@@ -87,12 +99,44 @@ class App {
     if (this.isKeyDown[this.KEY_Q]) {
       this.camera.rotation.z -= 0.01;
     }
+  }
+
+  private updateCameraVelocity() {
+    let accel = 0;
+    if (this.isKeyDown[this.KEY_SPC]) {
+      accel += 0.001;
+    }
+    if (this.isKeyDown[this.KEY_LSHIFT]) {
+      accel -= 0.001;
+    }
+    if (accel === 0) { return; }
+    const accelV = this.getLookAt().multiplyScalar(accel);
+    this.velocity.add(accelV);
+    if (this.velocity.length() > this.MAX_VELOCITY) {
+      this.velocity.normalize().multiplyScalar(this.MAX_VELOCITY);
+    }
+  }
+
+  private getLookAt(): Vector3 {
+    return (new Vector3(0, 0, -1)).applyQuaternion(this.camera.quaternion);
+  }
+
+  private draw() {
+    this.stats.begin();
+
+    this.renderer.render(this.scene, this.camera);
+
+    this.updateCameraRotation();
+    this.updateCameraVelocity();
+
+    this.camera.position.add(this.velocity);
+
+    this.stats.end();
     requestAnimationFrame(this.draw.bind(this));
   }
 }
 
 document.body.onload = () => {
-  console.log('hello world!');
   const container = document.getElementById('container');
   const app = new App(container);
 };
