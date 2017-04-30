@@ -1,5 +1,5 @@
 import { Scene, PerspectiveCamera, WebGLRenderer, Mesh, SphereGeometry,
-         MeshLambertMaterial, PointLight, BoxGeometry, Vector3 } from 'three';
+         MeshLambertMaterial, PointLight, BoxGeometry, Vector3, Euler } from 'three';
 import Stats = require('stats.js');
 
 class App {
@@ -73,6 +73,12 @@ class App {
     this.cube.position.y = -0.5;
     this.scene.add(this.cube);
 
+    const cube = new Mesh(geometry, new MeshLambertMaterial({ color: 0xffff00 }));
+    cube.position.x = -1;
+    cube.position.y = 0.5;
+    cube.position.z = -10;
+    this.scene.add(cube);
+
     const pointLight = new PointLight(0xffffff);
     pointLight.position.x = 0;
     pointLight.position.y = 100;
@@ -80,25 +86,27 @@ class App {
     this.scene.add(pointLight);
   }
 
-  private updateCameraRotation() {
+  private updateCameraRotation(): Vector3 {
+    const rot = new Vector3(0, 0, 0);
     if (this.isKeyDown[this.KEY_W]) {
-      this.camera.rotation.x += 0.01;
+      rot.x += 0.01;
     }
     if (this.isKeyDown[this.KEY_S]) {
-      this.camera.rotation.x -= 0.01;
+      rot.x -= 0.01;
     }
     if (this.isKeyDown[this.KEY_A]) {
-      this.camera.rotation.y += 0.01;
+      rot.y += 0.01;
     }
     if (this.isKeyDown[this.KEY_D]) {
-      this.camera.rotation.y -= 0.01;
+      rot.y -= 0.01;
     }
     if (this.isKeyDown[this.KEY_E]) {
-      this.camera.rotation.z += 0.01;
+      rot.z += 0.01;
     }
     if (this.isKeyDown[this.KEY_Q]) {
-      this.camera.rotation.z -= 0.01;
+      rot.z -= 0.01;
     }
+    return rot;
   }
 
   private updateCameraVelocity() {
@@ -126,7 +134,10 @@ class App {
 
     this.renderer.render(this.scene, this.camera);
 
-    this.updateCameraRotation();
+    const rot = this.updateCameraRotation();
+    this.camera.rotateX(rot.x);
+    this.camera.rotateY(rot.y);
+    this.camera.rotateZ(rot.z);
     this.updateCameraVelocity();
 
     this.camera.position.add(this.velocity);
