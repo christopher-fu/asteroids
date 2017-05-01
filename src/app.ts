@@ -1,5 +1,7 @@
 import { Scene, PerspectiveCamera, WebGLRenderer, Mesh, SphereGeometry,
-         MeshLambertMaterial, PointLight, BoxGeometry, Vector3, Euler } from 'three';
+         MeshLambertMaterial, PointLight, BoxGeometry, Vector3, Euler,
+         Geometry, Face3, MeshBasicMaterial, DoubleSide, DirectionalLight,
+         FaceColors } from 'three';
 import Stats = require('stats.js');
 
 class App {
@@ -9,22 +11,25 @@ class App {
   private viewAngle: number = 45;
   private aspect: number;
   private scene: Scene;
-  private cube: Mesh;
-  private isKeyDown: { [key: number]: boolean };
+  private isKeyDown: { [key: string]: boolean };
   private velocity: Vector3;
   private stats: Stats;
+  private debugMode: boolean;
 
   private readonly WIDTH = 1024;
   private readonly HEIGHT = 768;
 
-  private readonly KEY_W = 87;
-  private readonly KEY_A = 65;
-  private readonly KEY_S = 83;
-  private readonly KEY_D = 68;
-  private readonly KEY_Q = 81;
-  private readonly KEY_E = 69;
-  private readonly KEY_SPC = 32;
-  private readonly KEY_LSHIFT = 16;
+  private readonly KEY_W = 'KeyW';
+  private readonly KEY_A = 'KeyA';
+  private readonly KEY_S = 'KeyS';
+  private readonly KEY_D = 'KeyD';
+  private readonly KEY_Q = 'KeyQ';
+  private readonly KEY_E = 'KeyE';
+  private readonly KEY_X = 'KeyX';
+  private readonly KEY_R = 'KeyR';
+  private readonly KEY_SPC = 'Space';
+  private readonly KEY_LSHIFT = 'ShiftLeft';
+  private readonly KEY_BACKQUOTE = 'Backquote';
 
   private readonly MAX_VELOCITY = 1;
 
@@ -47,11 +52,26 @@ class App {
 
     // Set up keyboard controls
     document.onkeydown = (ev) => {
-      this.isKeyDown[ev.keyCode] = true;
+      this.isKeyDown[ev.code] = true;
     };
 
     document.onkeyup = (ev) => {
-      this.isKeyDown[ev.keyCode] = false;
+      this.isKeyDown[ev.code] = false;
+    };
+
+    document.onkeypress = (ev) => {
+      switch (ev.code) {
+      case this.KEY_BACKQUOTE:
+        this.debugMode = !this.debugMode;
+        console.log('Debug mode', this.debugMode);
+        break;
+      case this.KEY_R:
+        if (this.debugMode) {
+          const rot = this.camera.rotation;
+          rot.set(rot.x, rot.y, 0);
+        }
+        break;
+      }
     };
 
     this.addObjects();
@@ -68,54 +88,110 @@ class App {
     // this.scene.add(sphere);
 
     const geometry = new BoxGeometry(1, 1, 1);
-    this.cube = new Mesh(geometry, material);
-    this.cube.position.z = -5;
-    this.cube.position.y = -0.5;
-    this.scene.add(this.cube);
+    let cube = new Mesh(geometry, material);
+    cube.position.z = -5;
+    cube.position.y = -0.5;
+    this.scene.add(cube);
 
-    const cube = new Mesh(geometry, new MeshLambertMaterial({ color: 0xffff00 }));
+    cube = new Mesh(geometry, new MeshLambertMaterial({ color: 0xffff00 }));
     cube.position.x = -1;
     cube.position.y = 0.5;
     cube.position.z = -10;
     this.scene.add(cube);
+
+    // Spaceship
+    const ssGeom = new Geometry();
+    ssGeom.vertices = [
+      new Vector3(-0.5, -0.5, 0),
+      new Vector3(-0.5, 0.5, 0),
+      new Vector3(0.5, 0.5, 0),
+      new Vector3(0.5, -0.5, 0),
+      new Vector3(0, 0, 1)
+    ];
+    ssGeom.faces = [
+      new Face3(0, 1, 2),
+      new Face3(0, 2, 3),
+      new Face3(1, 0, 4),
+      new Face3(2, 1, 4),
+      new Face3(3, 2, 4),
+      new Face3(0, 3, 4)
+    ];
+    ssGeom.computeFaceNormals();
+    ssGeom.computeVertexNormals();
+    ssGeom.scale(0.4, 0.25, -0.5);
+    ssGeom.faces[0].color.setHex(0xff0000);
+    ssGeom.faces[1].color.setHex(0xff0000);
+    ssGeom.faces[3].color.setHex(0x00ff00);
+    const spaceship = new Mesh(ssGeom, new MeshLambertMaterial({
+      color: 0xffffff,
+      vertexColors: FaceColors,
+      side: DoubleSide
+    }));
+    spaceship.rotateX(30 * Math.PI / 180);
+    spaceship.position.z = -1.5;
+    spaceship.position.y = -0.6;
+    this.camera.add(spaceship);
 
     const pointLight = new PointLight(0xffffff);
     pointLight.position.x = 0;
     pointLight.position.y = 100;
     pointLight.position.z = 130;
     this.scene.add(pointLight);
+
+    const dirLight = new DirectionalLight(0xffffff, 1);
+    dirLight.position.set(0, 1, -1);
+    this.scene.add(dirLight);
   }
 
   private updateCameraRotation(): Vector3 {
+    const rotRate = 0.02;
     const rot = new Vector3(0, 0, 0);
     if (this.isKeyDown[this.KEY_W]) {
-      rot.x += 0.01;
+      rot.x += rotRate;
     }
     if (this.isKeyDown[this.KEY_S]) {
-      rot.x -= 0.01;
+      rot.x -= rotRate;
     }
     if (this.isKeyDown[this.KEY_A]) {
-      rot.y += 0.01;
+      rot.y += rotRate;
     }
     if (this.isKeyDown[this.KEY_D]) {
-      rot.y -= 0.01;
+      rot.y -= rotRate;
     }
     if (this.isKeyDown[this.KEY_E]) {
-      rot.z += 0.01;
+      rot.z += rotRate;
     }
     if (this.isKeyDown[this.KEY_Q]) {
-      rot.z -= 0.01;
+      rot.z -= rotRate;
     }
     return rot;
   }
 
   private updateCameraVelocity() {
+    if (this.debugMode) {
+      let vel = 0;
+      const velRate = 0.1;
+      if (this.isKeyDown[this.KEY_SPC]) {
+        vel += velRate;
+      }
+      if (this.isKeyDown[this.KEY_LSHIFT]) {
+        vel -= velRate;
+      }
+      this.velocity = this.getLookAt().normalize().multiplyScalar(vel);
+      return;
+    }
+
+    if (this.isKeyDown[this.KEY_X]) {
+      this.velocity = new Vector3(0, 0, 0);
+      return;
+    }
+    const accelRate = 0.001;
     let accel = 0;
     if (this.isKeyDown[this.KEY_SPC]) {
-      accel += 0.001;
+      accel += accelRate;
     }
     if (this.isKeyDown[this.KEY_LSHIFT]) {
-      accel -= 0.001;
+      accel -= accelRate;
     }
     if (accel === 0) { return; }
     const accelV = this.getLookAt().multiplyScalar(accel);
