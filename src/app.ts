@@ -1,7 +1,7 @@
 import { Scene, PerspectiveCamera, WebGLRenderer, Mesh, SphereGeometry,
          MeshLambertMaterial, PointLight, BoxGeometry, Vector3, Euler,
          Geometry, Face3, MeshBasicMaterial, DoubleSide, DirectionalLight,
-         FaceColors } from 'three';
+         FaceColors, Box3 } from 'three';
 import Stats = require('stats.js');
 import { Entity, Shot, Asteroid } from './entity';
 import KdTree = require('kd-tree');
@@ -19,6 +19,7 @@ class App {
   private static readonly KEY_X = 'KeyX';
   private static readonly KEY_R = 'KeyR';
   private static readonly KEY_F = 'KeyF';
+  private static readonly KEY_P = 'KeyP';
   private static readonly KEY_SPC = 'Space';
   private static readonly KEY_LSHIFT = 'ShiftLeft';
   private static readonly KEY_BACKQUOTE = 'Backquote';
@@ -36,16 +37,18 @@ class App {
 
   private renderer = new WebGLRenderer({ antialias: true });
   private camera = new PerspectiveCamera(App.VIEW_ANGLE, App.ASPECT);
-
   private scene = new Scene();
+
   private isKeyDown: { [key: string]: boolean } = {};
   private velocity = new Vector3(0, 0, 0);
   private stats = new Stats();
   private debugMode: boolean;
   private shots: Shot[] = [];
-  private closestAst: Entity | undefined;
-
   private asteroidKdt = new KdTree.kdTree<Entity>([], App.distanceFn, ['x', 'y', 'z']);
+  private canFireShot: boolean = true;
+  private shotCooldown = 500;
+  private spaceship: Mesh;
+  // private ssRotAng: number;
 
   constructor(container: HTMLElement) {
     this.scene.add(this.camera);
@@ -76,6 +79,13 @@ class App {
           const rot = this.camera.rotation;
           rot.set(rot.x, rot.y, 0);
         }
+        break;
+      case App.KEY_P:
+        console.log('camera', this.camera.position);
+        console.log((new Vector3(0, -1, 0)).applyMatrix4(this.camera.matrixWorld));
+        const v = new Vector3(0, -1, 0);
+        console.log(this.camera.localToWorld(v));
+        console.log(v);
         break;
       }
     };
@@ -123,9 +133,10 @@ class App {
     }));
     spaceship.position.z = -1.5;
     spaceship.position.y = -0.6;
-    const ssRotAng = 10 * Math.PI / 180;
-    spaceship.rotateX(ssRotAng);
+    // this.ssRotAng = 10 * Math.PI / 180;
+    // spaceship.rotateX(this.ssRotAng);
     this.camera.add(spaceship);
+    this.spaceship = spaceship;
 
     const pointLight = new PointLight(0xffffff);
     pointLight.position.x = 0;
@@ -137,13 +148,8 @@ class App {
     dirLight.position.set(0, 1, -1);
     this.scene.add(dirLight);
 
-    const cameraPos = this.camera.position.clone().applyMatrix4(this.camera.matrixWorld);
-    const p = spaceship.position.clone().add(new Vector3(0, -0.03, -Math.cos(ssRotAng)))
-      .applyMatrix4(spaceship.matrixWorld);
-    cameraPos.add(p);
-    const shot = new Shot(cameraPos, new Vector3(0, 0, -0.01));
-    this.shots.push(shot);
-    this.scene.add(shot.mesh);
+    this.camera.updateMatrixWorld(true);
+    this.spaceship.updateMatrixWorld(true);
   }
 
   private updateCameraRotation(): Vector3 {
@@ -162,10 +168,10 @@ class App {
       rot.y -= rotRate;
     }
     if (this.isKeyDown[App.KEY_E]) {
-      rot.z += rotRate;
+      rot.z -= rotRate;
     }
     if (this.isKeyDown[App.KEY_Q]) {
-      rot.z -= rotRate;
+      rot.z += rotRate;
     }
     return rot;
   }
@@ -208,9 +214,41 @@ class App {
     return (new Vector3(0, 0, -1)).applyQuaternion(this.camera.quaternion);
   }
 
+  private checkForCollisions() {
+    for (let i = this.shots.length - 1; i >= 0; i--) {
+      const shot = this.shots[i];
+      shot.pos = shot.pos.add(shot.vel);
+      // Check for 10 closest asteroids in kd-tree
+      const nearestAsts = this.asteroidKdt.nearest(shot, 10).map((x) => x[0]);
+      for (const ast of nearestAsts) {
+        const astBox = new Box3().setFromObject(ast.mesh);
+        const shotBox = new Box3().setFromObject(shot.mesh);
+        if (astBox.intersectsBox(shotBox)) {
+          // console.log('Collision', ast, shot);
+          this.shots.splice(i, 1);
+          this.scene.remove(shot.mesh);
+        }
+      }
+    }
+  }
+
+  private fireShot() {
+    if (this.isKeyDown[App.KEY_SPC] && this.canFireShot) {
+      console.log('Firing shot');
+      this.camera.updateMatrixWorld(true);
+      this.spaceship.updateMatrixWorld(true);
+
+      const pos = (new Vector3(0, -0.6, -1.5)).add(new Vector3(0, 0, -0.5));
+      const shot = new Shot(this.camera.localToWorld(pos), this.getLookAt().normalize().multiplyScalar(0.1));
+      this.shots.push(shot);
+      this.scene.add(shot.mesh);
+      this.canFireShot = false;
+      setTimeout(() => this.canFireShot = true, this.shotCooldown);
+    }
+  }
+
   private draw() {
     this.stats.begin();
-
     this.renderer.render(this.scene, this.camera);
 
     const rot = this.updateCameraRotation();
@@ -218,19 +256,10 @@ class App {
     this.camera.rotateY(rot.y);
     this.camera.rotateZ(rot.z);
     this.updateCameraVelocity();
-
     this.camera.position.add(this.velocity);
 
-    for (const shot of this.shots) {
-      shot.pos = shot.pos.add(shot.vel);
-      // Sort of sketch: TS's type system matches on object shape, so this sort
-      // of thing is ok...
-      const nearest = this.asteroidKdt.nearest(shot, 10)[0][0];
-      if (!nearest.equal(this.closestAst)) {
-        this.closestAst = nearest;
-        console.log(this.closestAst);
-      }
-    }
+    this.fireShot();
+    this.checkForCollisions();
 
     this.stats.end();
     requestAnimationFrame(this.draw.bind(this));
