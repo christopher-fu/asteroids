@@ -11,7 +11,8 @@
       "trailing-comma": [false],
       "no-consecutive-blank-lines": [false],
       "object-literal-sort-keys": false,
-      "variable-name": [true, "check-format", "allow-leading-underscore", "ban-keywords"]
+      "variable-name": [true, "check-format", "allow-leading-underscore", "ban-keywords"],
+      "max-classes-per-file": [false]
     },
     "rulesDirectory": []
 }

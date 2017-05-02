@@ -3,7 +3,7 @@ import { Scene, PerspectiveCamera, WebGLRenderer, Mesh, SphereGeometry,
          Geometry, Face3, MeshBasicMaterial, DoubleSide, DirectionalLight,
          FaceColors } from 'three';
 import Stats = require('stats.js');
-import Shot from './shot';
+import { Entity, Shot, Asteroid } from './entity';
 import KdTree = require('kd-tree');
 
 class App {
@@ -28,8 +28,10 @@ class App {
   private static readonly ASPECT = App.WIDTH / App.HEIGHT;
   private static readonly VIEW_ANGLE = 45;
 
-  private static distanceFn(a: Vector3, b: Vector3): number {
-    return Math.sqrt(a.x ** 2 + a.y ** 2 + a.z ** 2);
+  private static distanceFn(a: Entity, b: Entity): number {
+    return Math.sqrt((a.x - b.x) ** 2 +
+                     (a.y - b.y) ** 2 +
+                     (a.z - b.z) ** 2);
   }
 
   private renderer = new WebGLRenderer({ antialias: true });
@@ -40,9 +42,10 @@ class App {
   private velocity = new Vector3(0, 0, 0);
   private stats = new Stats();
   private debugMode: boolean;
-  private shots: [Shot] = [] as [Shot];
+  private shots: Shot[] = [];
+  private closestAst: Asteroid | undefined;
 
-  private asteroidKdt = new KdTree.KdTree<Vector3>([] as [Vector3], App.distanceFn, ['x', 'y', 'z']);
+  private asteroidKdt = new KdTree.kdTree<Entity>([], App.distanceFn, ['x', 'y', 'z']);
 
   constructor(container: HTMLElement) {
     this.scene.add(this.camera);
@@ -82,27 +85,13 @@ class App {
   }
 
   private addObjects() {
-    // const RADIUS = 50;
-    // const SEGMENTS = 16;
-    // const RINGS = 16;
-    const material = new MeshLambertMaterial({ color: 0xcc0000 });
-    // const sphere = new Mesh(new SphereGeometry(RADIUS, SEGMENTS, RINGS), material);
-    // sphere.position.z = -300;
-    // this.scene.add(sphere);
+    let ast = new Asteroid(1, 0xf442e5, new Vector3(0, -0.5, -5), new Vector3());
+    this.scene.add(ast.mesh);
+    this.asteroidKdt.insert(ast);
 
-    const geometry = new BoxGeometry(1, 1, 1);
-    let cube = new Mesh(geometry, material);
-    cube.position.z = -5;
-    cube.position.y = -0.5;
-    this.scene.add(cube);
-    this.asteroidKdt.insert(cube.position);
-
-    cube = new Mesh(geometry, new MeshLambertMaterial({ color: 0xffff00 }));
-    cube.position.x = -1;
-    cube.position.y = 0.5;
-    cube.position.z = -10;
-    this.scene.add(cube);
-    this.asteroidKdt.insert(cube.position);
+    ast = new Asteroid(1, 0xf532ab, new Vector3(-1, 0.5, -10), new Vector3());
+    this.scene.add(ast.mesh);
+    this.asteroidKdt.insert(ast);
 
     // Spaceship
     const ssGeom = new Geometry();
@@ -234,7 +223,11 @@ class App {
 
     for (const shot of this.shots) {
       shot.pos = shot.pos.add(shot.vel);
-      this.asteroidKdt.nearest(shot.pos, 10);
+      const nearest = this.asteroidKdt.nearest(shot, 10)[0][0];
+      if (!nearest.equal(this.closestAst)) {
+        this.closestAst = nearest;
+        console.log(this.closestAst);
+      }
     }
 
     this.stats.end();
@@ -244,5 +237,7 @@ class App {
 
 document.body.onload = () => {
   const container = document.getElementById('container');
-  const app = new App(container);
+  if (container) {
+    const app = new App(container);
+  }
 };
