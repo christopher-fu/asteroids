@@ -9,6 +9,7 @@ import KdTree = require('kd-tree');
 class App {
   private static readonly WIDTH = 1024;
   private static readonly HEIGHT = 768;
+  private static readonly DRAW_DISTANCE = 10;
 
   private static readonly KEY_W = 'KeyW';
   private static readonly KEY_A = 'KeyA';
@@ -23,8 +24,6 @@ class App {
   private static readonly KEY_SPC = 'Space';
   private static readonly KEY_LSHIFT = 'ShiftLeft';
   private static readonly KEY_BACKQUOTE = 'Backquote';
-
-  private static readonly MAX_VELOCITY = 1;
 
   private static readonly ASPECT = App.WIDTH / App.HEIGHT;
   private static readonly VIEW_ANGLE = 45;
@@ -47,6 +46,11 @@ class App {
   private asteroidKdt = new KdTree.kdTree<Entity>([], App.distanceFn, ['x', 'y', 'z']);
   private canFireShot: boolean = true;
   private shotCooldown = 500;
+  private rotRate = 0.02;
+  private velRate = 0.1;
+  private accelRate = 0.001;
+  private maxVel = 0.3;
+  private shotVel = 0.4;
   private spaceship: Mesh;
   // private ssRotAng: number;
 
@@ -153,25 +157,24 @@ class App {
   }
 
   private updateCameraRotation(): Vector3 {
-    const rotRate = 0.02;
     const rot = new Vector3(0, 0, 0);
     if (this.isKeyDown[App.KEY_W]) {
-      rot.x += rotRate;
+      rot.x += this.rotRate;
     }
     if (this.isKeyDown[App.KEY_S]) {
-      rot.x -= rotRate;
+      rot.x -= this.rotRate;
     }
     if (this.isKeyDown[App.KEY_A]) {
-      rot.y += rotRate;
+      rot.y += this.rotRate;
     }
     if (this.isKeyDown[App.KEY_D]) {
-      rot.y -= rotRate;
+      rot.y -= this.rotRate;
     }
     if (this.isKeyDown[App.KEY_E]) {
-      rot.z -= rotRate;
+      rot.z -= this.rotRate;
     }
     if (this.isKeyDown[App.KEY_Q]) {
-      rot.z += rotRate;
+      rot.z += this.rotRate;
     }
     return rot;
   }
@@ -179,12 +182,11 @@ class App {
   private updateCameraVelocity() {
     if (this.debugMode) {
       let vel = 0;
-      const velRate = 0.1;
       if (this.isKeyDown[App.KEY_F]) {
-        vel += velRate;
+        vel += this.velRate;
       }
       if (this.isKeyDown[App.KEY_LSHIFT]) {
-        vel -= velRate;
+        vel -= this.velRate;
       }
       this.velocity = this.getLookAt().normalize().multiplyScalar(vel);
       return;
@@ -194,19 +196,18 @@ class App {
       this.velocity = new Vector3(0, 0, 0);
       return;
     }
-    const accelRate = 0.001;
     let accel = 0;
     if (this.isKeyDown[App.KEY_F]) {
-      accel += accelRate;
+      accel += this.accelRate;
     }
     if (this.isKeyDown[App.KEY_LSHIFT]) {
-      accel -= accelRate;
+      accel -= this.accelRate;
     }
     if (accel === 0) { return; }
     const accelV = this.getLookAt().multiplyScalar(accel);
     this.velocity.add(accelV);
-    if (this.velocity.length() > App.MAX_VELOCITY) {
-      this.velocity.normalize().multiplyScalar(App.MAX_VELOCITY);
+    if (this.velocity.length() > this.maxVel) {
+      this.velocity.normalize().multiplyScalar(this.maxVel);
     }
   }
 
@@ -217,6 +218,12 @@ class App {
   private checkForCollisions() {
     for (let i = this.shots.length - 1; i >= 0; i--) {
       const shot = this.shots[i];
+      // Remove shot if it is >= DRAW_DISTANCE away
+      if (shot.mesh.position.distanceTo(this.camera.position) >= App.DRAW_DISTANCE) {
+        this.shots.splice(i, 1);
+        this.scene.remove(shot.mesh);
+        continue;
+      }
       shot.pos = shot.pos.add(shot.vel);
       // Check for 10 closest asteroids in kd-tree
       const nearestAsts = this.asteroidKdt.nearest(shot, 10).map((x) => x[0]);
@@ -239,7 +246,7 @@ class App {
       this.spaceship.updateMatrixWorld(true);
 
       const pos = (new Vector3(0, -0.6, -1.5)).add(new Vector3(0, 0, -0.5));
-      const shot = new Shot(this.camera.localToWorld(pos), this.getLookAt().normalize().multiplyScalar(0.1));
+      const shot = new Shot(this.camera.localToWorld(pos), this.getLookAt().normalize().multiplyScalar(this.shotVel));
       this.shots.push(shot);
       this.scene.add(shot.mesh);
       this.canFireShot = false;
