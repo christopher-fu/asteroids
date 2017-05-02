@@ -3,50 +3,53 @@ import { Scene, PerspectiveCamera, WebGLRenderer, Mesh, SphereGeometry,
          Geometry, Face3, MeshBasicMaterial, DoubleSide, DirectionalLight,
          FaceColors } from 'three';
 import Stats = require('stats.js');
+import Shot from './shot';
+import KdTree = require('kd-tree');
 
 class App {
-  private canvas: HTMLCanvasElement;
-  private renderer: WebGLRenderer;
-  private camera: PerspectiveCamera;
-  private viewAngle: number = 45;
-  private aspect: number;
-  private scene: Scene;
-  private isKeyDown: { [key: string]: boolean };
-  private velocity: Vector3;
-  private stats: Stats;
+  private static readonly WIDTH = 1024;
+  private static readonly HEIGHT = 768;
+
+  private static readonly KEY_W = 'KeyW';
+  private static readonly KEY_A = 'KeyA';
+  private static readonly KEY_S = 'KeyS';
+  private static readonly KEY_D = 'KeyD';
+  private static readonly KEY_Q = 'KeyQ';
+  private static readonly KEY_E = 'KeyE';
+  private static readonly KEY_X = 'KeyX';
+  private static readonly KEY_R = 'KeyR';
+  private static readonly KEY_F = 'KeyF';
+  private static readonly KEY_SPC = 'Space';
+  private static readonly KEY_LSHIFT = 'ShiftLeft';
+  private static readonly KEY_BACKQUOTE = 'Backquote';
+
+  private static readonly MAX_VELOCITY = 1;
+
+  private static readonly ASPECT = App.WIDTH / App.HEIGHT;
+  private static readonly VIEW_ANGLE = 45;
+
+  private static distanceFn(a: Vector3, b: Vector3): number {
+    return Math.sqrt(a.x ** 2 + a.y ** 2 + a.z ** 2);
+  }
+
+  private renderer = new WebGLRenderer({ antialias: true });
+  private camera = new PerspectiveCamera(App.VIEW_ANGLE, App.ASPECT);
+
+  private scene = new Scene();
+  private isKeyDown: { [key: string]: boolean } = {};
+  private velocity = new Vector3(0, 0, 0);
+  private stats = new Stats();
   private debugMode: boolean;
+  private shots: [Shot] = [] as [Shot];
 
-  private readonly WIDTH = 1024;
-  private readonly HEIGHT = 768;
-
-  private readonly KEY_W = 'KeyW';
-  private readonly KEY_A = 'KeyA';
-  private readonly KEY_S = 'KeyS';
-  private readonly KEY_D = 'KeyD';
-  private readonly KEY_Q = 'KeyQ';
-  private readonly KEY_E = 'KeyE';
-  private readonly KEY_X = 'KeyX';
-  private readonly KEY_R = 'KeyR';
-  private readonly KEY_SPC = 'Space';
-  private readonly KEY_LSHIFT = 'ShiftLeft';
-  private readonly KEY_BACKQUOTE = 'Backquote';
-
-  private readonly MAX_VELOCITY = 1;
+  private asteroidKdt = new KdTree.KdTree<Vector3>([] as [Vector3], App.distanceFn, ['x', 'y', 'z']);
 
   constructor(container: HTMLElement) {
-    this.aspect = this.WIDTH / this.HEIGHT;
-    this.renderer = new WebGLRenderer();
-    this.camera = new PerspectiveCamera(this.viewAngle, this.aspect);
-    this.scene = new Scene();
     this.scene.add(this.camera);
-    this.renderer.setSize(this.WIDTH, this.HEIGHT);
+    this.renderer.setSize(App.WIDTH, App.HEIGHT);
 
     container.appendChild(this.renderer.domElement);
 
-    this.isKeyDown = {};
-    this.velocity = new Vector3(0, 0, 0);
-
-    this.stats = new Stats();
     this.stats.showPanel(0);
     document.body.appendChild(this.stats.dom);
 
@@ -61,11 +64,11 @@ class App {
 
     document.onkeypress = (ev) => {
       switch (ev.code) {
-      case this.KEY_BACKQUOTE:
+      case App.KEY_BACKQUOTE:
         this.debugMode = !this.debugMode;
         console.log('Debug mode', this.debugMode);
         break;
-      case this.KEY_R:
+      case App.KEY_R:
         if (this.debugMode) {
           const rot = this.camera.rotation;
           rot.set(rot.x, rot.y, 0);
@@ -92,12 +95,14 @@ class App {
     cube.position.z = -5;
     cube.position.y = -0.5;
     this.scene.add(cube);
+    this.asteroidKdt.insert(cube.position);
 
     cube = new Mesh(geometry, new MeshLambertMaterial({ color: 0xffff00 }));
     cube.position.x = -1;
     cube.position.y = 0.5;
     cube.position.z = -10;
     this.scene.add(cube);
+    this.asteroidKdt.insert(cube.position);
 
     // Spaceship
     const ssGeom = new Geometry();
@@ -127,9 +132,10 @@ class App {
       vertexColors: FaceColors,
       side: DoubleSide
     }));
-    spaceship.rotateX(30 * Math.PI / 180);
     spaceship.position.z = -1.5;
     spaceship.position.y = -0.6;
+    const ssRotAng = 10 * Math.PI / 180;
+    spaceship.rotateX(ssRotAng);
     this.camera.add(spaceship);
 
     const pointLight = new PointLight(0xffffff);
@@ -141,27 +147,35 @@ class App {
     const dirLight = new DirectionalLight(0xffffff, 1);
     dirLight.position.set(0, 1, -1);
     this.scene.add(dirLight);
+
+    const cameraPos = this.camera.position.clone().applyMatrix4(this.camera.matrixWorld);
+    const p = spaceship.position.clone().add(new Vector3(0, -0.03, -Math.cos(ssRotAng)))
+      .applyMatrix4(spaceship.matrixWorld);
+    cameraPos.add(p);
+    const shot = new Shot(cameraPos, new Vector3(0, 0, -0.01));
+    this.shots.push(shot);
+    this.scene.add(shot.mesh);
   }
 
   private updateCameraRotation(): Vector3 {
     const rotRate = 0.02;
     const rot = new Vector3(0, 0, 0);
-    if (this.isKeyDown[this.KEY_W]) {
+    if (this.isKeyDown[App.KEY_W]) {
       rot.x += rotRate;
     }
-    if (this.isKeyDown[this.KEY_S]) {
+    if (this.isKeyDown[App.KEY_S]) {
       rot.x -= rotRate;
     }
-    if (this.isKeyDown[this.KEY_A]) {
+    if (this.isKeyDown[App.KEY_A]) {
       rot.y += rotRate;
     }
-    if (this.isKeyDown[this.KEY_D]) {
+    if (this.isKeyDown[App.KEY_D]) {
       rot.y -= rotRate;
     }
-    if (this.isKeyDown[this.KEY_E]) {
+    if (this.isKeyDown[App.KEY_E]) {
       rot.z += rotRate;
     }
-    if (this.isKeyDown[this.KEY_Q]) {
+    if (this.isKeyDown[App.KEY_Q]) {
       rot.z -= rotRate;
     }
     return rot;
@@ -171,33 +185,33 @@ class App {
     if (this.debugMode) {
       let vel = 0;
       const velRate = 0.1;
-      if (this.isKeyDown[this.KEY_SPC]) {
+      if (this.isKeyDown[App.KEY_F]) {
         vel += velRate;
       }
-      if (this.isKeyDown[this.KEY_LSHIFT]) {
+      if (this.isKeyDown[App.KEY_LSHIFT]) {
         vel -= velRate;
       }
       this.velocity = this.getLookAt().normalize().multiplyScalar(vel);
       return;
     }
 
-    if (this.isKeyDown[this.KEY_X]) {
+    if (this.isKeyDown[App.KEY_X]) {
       this.velocity = new Vector3(0, 0, 0);
       return;
     }
     const accelRate = 0.001;
     let accel = 0;
-    if (this.isKeyDown[this.KEY_SPC]) {
+    if (this.isKeyDown[App.KEY_F]) {
       accel += accelRate;
     }
-    if (this.isKeyDown[this.KEY_LSHIFT]) {
+    if (this.isKeyDown[App.KEY_LSHIFT]) {
       accel -= accelRate;
     }
     if (accel === 0) { return; }
     const accelV = this.getLookAt().multiplyScalar(accel);
     this.velocity.add(accelV);
-    if (this.velocity.length() > this.MAX_VELOCITY) {
-      this.velocity.normalize().multiplyScalar(this.MAX_VELOCITY);
+    if (this.velocity.length() > App.MAX_VELOCITY) {
+      this.velocity.normalize().multiplyScalar(App.MAX_VELOCITY);
     }
   }
 
@@ -217,6 +231,11 @@ class App {
     this.updateCameraVelocity();
 
     this.camera.position.add(this.velocity);
+
+    for (const shot of this.shots) {
+      shot.pos = shot.pos.add(shot.vel);
+      this.asteroidKdt.nearest(shot.pos, 10);
+    }
 
     this.stats.end();
     requestAnimationFrame(this.draw.bind(this));
