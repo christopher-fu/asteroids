@@ -43,7 +43,7 @@ class App {
   private stats = new Stats();
   private debugMode: boolean;
   private shots: Shot[] = [];
-  private closestAst: Asteroid | undefined;
+  private closestAst: Entity | undefined;
 
   private asteroidKdt = new KdTree.kdTree<Entity>([], App.distanceFn, ['x', 'y', 'z']);
 
@@ -223,6 +223,8 @@ class App {
 
     for (const shot of this.shots) {
       shot.pos = shot.pos.add(shot.vel);
+      // Sort of sketch: TS's type system matches on object shape, so this sort
+      // of thing is ok...
       const nearest = this.asteroidKdt.nearest(shot, 10)[0][0];
       if (!nearest.equal(this.closestAst)) {
         this.closestAst = nearest;
