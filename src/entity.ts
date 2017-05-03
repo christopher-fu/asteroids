@@ -100,9 +100,9 @@ export class Asteroid extends Entity {
     const m0 = this.radius ** 3;
     const v0Mag = this.vel.length();
     const v1Mag = m0 * v0Mag * Math.sin(t2) /
-      (m1 * (Math.cos(t2) * Math.sin(t1) + Math.cos(t1) * Math.sin(t2)));
+                  (m1 * (Math.cos(t2) * Math.sin(t1) + Math.cos(t1) * Math.sin(t2)));
     const v2Mag = m0 * v0Mag * (1 / Math.cos(t2)) * Math.sin(t1) /
-      (m2 * (Math.sin(t1) + Math.cos(t1) * Math.tan(t2)));
+                  (m2 * (Math.sin(t1) + Math.cos(t1) * Math.tan(t2)));
 
     // Need to rotate by an axis perpendicular to original velocity
     const axisX = Math.random();
