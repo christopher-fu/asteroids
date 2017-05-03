@@ -1,4 +1,6 @@
-import { Vector3, Mesh, SphereGeometry, MeshLambertMaterial } from 'three';
+import { Vector3, Mesh, SphereGeometry, MeshLambertMaterial,
+         MeshStandardMaterial, Vector2 } from 'three';
+import { sphereTextures } from './textureloader';
 
 export abstract class Entity {
   public mesh: Mesh;
@@ -56,8 +58,13 @@ export class Asteroid extends Entity {
 
   constructor(public radius: number, public color: number, pos: Vector3, vel: Vector3) {
     super();
-
-    const material = new MeshLambertMaterial({ color });
+    const tex = sphereTextures[Math.floor(Math.random() * sphereTextures.length)];
+    const material = new MeshStandardMaterial({
+      color,
+      displacementMap: tex,
+      displacementScale: 0.3,
+      metalness: 0
+    });
     this.mesh = new Mesh(new SphereGeometry(radius, Asteroid.SEGMENTS, Asteroid.SEGMENTS), material);
     this.mesh.position.set(pos.x, pos.y, pos.z);
 
