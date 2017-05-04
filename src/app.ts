@@ -1,6 +1,8 @@
-import { Scene, PerspectiveCamera, WebGLRenderer, Mesh, MeshLambertMaterial,
-         PointLight, Vector3, Geometry, Face3, DoubleSide, DirectionalLight,
-         FaceColors, Box3 } from 'three';
+import {
+  Scene, PerspectiveCamera, WebGLRenderer, Mesh, MeshLambertMaterial,
+  PointLight, Vector3, Geometry, Face3, DoubleSide, DirectionalLight,
+  FaceColors, Box3, AmbientLight
+} from 'three';
 import Stats = require('stats.js');
 import { Entity, Shot, Asteroid } from './entity';
 import KdTree = require('kd-tree');
@@ -31,9 +33,10 @@ class App {
 
   private static distanceFn(a: Entity, b: Entity): number {
     return Math.sqrt((a.x - b.x) ** 2 +
-                     (a.y - b.y) ** 2 +
-                     (a.z - b.z) ** 2);
+      (a.y - b.y) ** 2 +
+      (a.z - b.z) ** 2);
   }
+
 
   // POTENTIALLY CHANGEABLE CONSTANTS
   private shotCooldown = 500;
@@ -42,9 +45,10 @@ class App {
   private accelRate = 0.001;
   private maxVel = 0.3;
   private shotVel = 0.4;
-  private asteroidV0 = 0.02;
-  private asteroidRadius = 1;
+  private asteroidV0 = 0.04;
+  private asteroidR0 = 1;
   private asteroidColor = 0xf442e5;
+  private asteroidMinRadius = 0.5;
 
   private spaceship: Mesh;
 
@@ -60,6 +64,8 @@ class App {
   private asteroidKdt = new KdTree.kdTree<Entity>([], App.distanceFn, ['x', 'y', 'z']);
   private asteroids: Asteroid[] = [];
   private canFireShot: boolean = true;
+  private score = 0;
+  private scoreSpan = document.getElementById('score')!;
 
   constructor(container: HTMLElement) {
     this.scene.add(this.camera);
@@ -81,23 +87,23 @@ class App {
 
     document.onkeypress = (ev) => {
       switch (ev.code) {
-      case App.KEY_BACKQUOTE:
-        this.debugMode = !this.debugMode;
-        console.log('Debug mode', this.debugMode);
-        break;
-      case App.KEY_R:
-        if (this.debugMode) {
-          const rot = this.camera.rotation;
-          rot.set(rot.x, rot.y, 0);
-        }
-        break;
-      // case App.KEY_P:
-      //   console.log('camera', this.camera.position);
-      //   console.log((new Vector3(0, -1, 0)).applyMatrix4(this.camera.matrixWorld));
-      //   const v = new Vector3(0, -1, 0);
-      //   console.log(this.camera.localToWorld(v));
-      //   console.log(v);
-      //   break;
+        case App.KEY_BACKQUOTE:
+          this.debugMode = !this.debugMode;
+          console.log('Debug mode', this.debugMode);
+          break;
+        case App.KEY_R:
+          if (this.debugMode) {
+            const rot = this.camera.rotation;
+            rot.set(rot.x, rot.y, 0);
+          }
+          break;
+        // case App.KEY_P:
+        //   console.log('camera', this.camera.position);
+        //   console.log((new Vector3(0, -1, 0)).applyMatrix4(this.camera.matrixWorld));
+        //   const v = new Vector3(0, -1, 0);
+        //   console.log(this.camera.localToWorld(v));
+        //   console.log(v);
+        //   break;
       }
     };
 
@@ -121,7 +127,11 @@ class App {
     }
 
     this.fireShot();
-    this.checkForCollisions();
+    const stop = this.checkForCollisions();
+    if (stop) {
+      document.getElementById('message')!.innerText = 'Game over!';
+      return;
+    }
 
     this.cullObjects();
 
@@ -135,7 +145,9 @@ class App {
     // Asteroids
     for (let i = this.asteroids.length - 1; i >= 0; i--) {
       const ast = this.asteroids[i];
-      if (ast.pos.distanceTo(this.camera.position) >= App.DRAW_DISTANCE) {
+      // Remove if asteroid radius is small enough
+      if (ast.pos.distanceTo(this.camera.position) >= App.DRAW_DISTANCE ||
+          ast.radius < this.asteroidMinRadius) {
         this.asteroids.splice(i, 1);
         this.asteroidKdt.remove(ast);
         this.scene.remove(ast.mesh);
@@ -153,18 +165,12 @@ class App {
   }
 
   private addObjects() {
-    // const ast = new Asteroid(this.asteroidRadius, this.asteroidColor,
-    //                          new Vector3(0, -0.5, -5),
-    //                          new Vector3(0, 0, -0.02));
-    // this.scene.add(ast.mesh);
-    // this.asteroidKdt.insert(ast);
-    // this.asteroids.push(ast);
-
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 50; i++) {
       this.spawnAsteroid();
     }
 
     // Spaceship
+    // Square pyramid geometry
     const ssGeom = new Geometry();
     ssGeom.vertices = [
       new Vector3(-0.5, -0.5, 0),
@@ -194,23 +200,23 @@ class App {
     }));
     spaceship.position.z = -1.5;
     spaceship.position.y = -0.6;
-    // this.ssRotAng = 10 * Math.PI / 180;
-    // spaceship.rotateX(this.ssRotAng);
     this.camera.add(spaceship);
     this.spaceship = spaceship;
 
-    const pointLight = new PointLight(0xffffff);
-    pointLight.position.x = 0;
-    pointLight.position.y = 100;
-    pointLight.position.z = 130;
-    this.scene.add(pointLight);
+    // const pointLight = new PointLight(0xffffff);
+    // pointLight.position.x = 0;
+    // pointLight.position.y = 100;
+    // pointLight.position.z = 130;
+    // this.scene.add(pointLight);
 
     const dirLight = new DirectionalLight(0xffffff, 1);
     dirLight.position.set(0, 1, -1);
     this.scene.add(dirLight);
 
-    this.camera.updateMatrixWorld(true);
-    this.spaceship.updateMatrixWorld(true);
+    this.scene.add(new AmbientLight(0x404040));
+
+    // this.camera.updateMatrixWorld(true);
+    // this.spaceship.updateMatrixWorld(true);
   }
 
   private updateCameraRotation() {
@@ -274,19 +280,31 @@ class App {
     return (new Vector3(0, 0, -1)).applyQuaternion(this.camera.quaternion);
   }
 
-  private checkForCollisions() {
+  private checkForCollisions(): boolean {
+    // Check for spaceship collision with asteroids
+    const pos = this.camera.localToWorld(this.spaceship.position.clone());
+    let nearestAsts = this.asteroidKdt.nearest(new Entity(pos, new Vector3()), 10)
+      .map((x) => x[0]);
+    for (const a of nearestAsts) {
+      const ast = a as Asteroid;
+      const astBox = new Box3().setFromObject(ast.mesh);
+      const ssBox = new Box3().setFromObject(this.spaceship);
+      if (astBox.intersectsBox(ssBox)) {
+        return true;
+      }
+    }
+
+    // Check for shot collision with asteroids
     for (let i = this.shots.length - 1; i >= 0; i--) {
       const shot = this.shots[i];
       shot.pos = shot.pos.add(shot.vel);
       // Check for 10 closest asteroids in kd-tree
-      const nearestAsts = this.asteroidKdt.nearest(shot, 10).map((x) => x[0]);
+      nearestAsts = this.asteroidKdt.nearest(shot, 10).map((x) => x[0]);
       for (const a of nearestAsts) {
         const ast = a as Asteroid;
         const astBox = new Box3().setFromObject(ast.mesh);
         const shotBox = new Box3().setFromObject(shot.mesh);
         if (astBox.intersectsBox(shotBox)) {
-          // console.log('Collision', ast, shot);
-
           this.scene.remove(ast.mesh);
 
           const [ast1, ast2] = ast.split();
@@ -311,13 +329,14 @@ class App {
           this.shots.splice(i, 1);
           this.scene.remove(shot.mesh);
 
-          // console.log(this.asteroids.length);
-          // console.log(this.asteroidKdt.items().length);
+          this.score++;
+          this.scoreSpan.innerText = this.score.toString();
 
           break;
         }
       }
     }
+    return false;
   }
 
   private updateAsteroidPositions() {
@@ -330,13 +349,9 @@ class App {
 
   private fireShot() {
     if (this.isKeyDown[App.KEY_SPC] && this.canFireShot) {
-      // console.log('Firing shot');
-      this.camera.updateMatrixWorld(true);
-      this.spaceship.updateMatrixWorld(true);
-
-      const pos = (new Vector3(0, -0.6, -1.5)).add(new Vector3(0, 0, -0.5));
+      const pos = this.spaceship.position.clone().add(new Vector3(0, 0, -0.5));
       const shot = new Shot(this.camera.localToWorld(pos), this.getLookAt().normalize()
-                       .multiplyScalar(this.shotVel));
+        .multiplyScalar(this.shotVel));
       this.shots.push(shot);
       this.scene.add(shot.mesh);
       this.canFireShot = false;
@@ -352,12 +367,18 @@ class App {
     const phi = Math.random() * 180 * Math.PI / 180;
 
     const offset = new Vector3(r * Math.cos(theta) * Math.sin(phi),
-                               r * Math.sin(theta) * Math.sin(phi),
-                               r * Math.cos(phi));
+      r * Math.sin(theta) * Math.sin(phi),
+      r * Math.cos(phi));
     const pos = offset.clone().add(this.camera.position);
-    const vel = pos.clone().normalize().multiplyScalar(-this.asteroidV0);
-    const ast = new Asteroid(this.asteroidRadius, this.asteroidColor,
-                             pos, vel);
+    // Add some noise to velocity
+    const vel = pos.clone().normalize()
+      .add(new Vector3(Math.random() - 0.5,
+        Math.random() - 0.5,
+        Math.random() - 0.5))
+      .normalize()
+      .multiplyScalar(-this.asteroidV0);
+    const ast = new Asteroid(this.asteroidR0, this.asteroidColor,
+      pos, vel);
     this.asteroids.push(ast);
     this.asteroidKdt.insert(ast);
     this.scene.add(ast.mesh);
@@ -365,9 +386,6 @@ class App {
 }
 
 document.body.onload = () => {
-  const container = document.getElementById('container');
-  if (container) {
-    const app = new App(container);
-    app.draw();
-  }
+  const container = document.getElementById('container')!;
+  new App(container).draw();
 };

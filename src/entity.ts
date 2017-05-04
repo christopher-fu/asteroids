@@ -1,8 +1,10 @@
-import { Vector3, Mesh, SphereGeometry, MeshLambertMaterial,
-         MeshStandardMaterial } from 'three';
+import {
+  Vector3, Mesh, SphereGeometry, MeshLambertMaterial,
+  MeshStandardMaterial
+} from 'three';
 import { sphereTextures } from './textureloader';
 
-export abstract class Entity {
+export class Entity {
   public mesh: Mesh;
   public vel: Vector3;
 
@@ -13,6 +15,11 @@ export abstract class Entity {
   private _y: number;
   private _z: number;
 
+  constructor(pos: Vector3, vel: Vector3) {
+    this.pos = pos;
+    this.vel = vel;
+  }
+
   get pos(): Vector3 {
     return this._pos;
   }
@@ -22,7 +29,9 @@ export abstract class Entity {
     this._x = p.x;
     this._y = p.y;
     this._z = p.z;
-    this.mesh.position.set(p.x, p.y, p.z);
+    if (this.mesh) {
+      this.mesh.position.set(p.x, p.y, p.z);
+    }
   }
 
   get x(): number { return this._x; }
@@ -41,15 +50,15 @@ export class Shot extends Entity {
   private static readonly SEGMENTS = 50;
 
   constructor(pos: Vector3, vel: Vector3) {
-    super();
+    super(pos, vel);
 
     const radius = 0.04;
     const material = new MeshLambertMaterial({ color: 0x4248f4 });
     this.mesh = new Mesh(new SphereGeometry(radius, Shot.SEGMENTS, Shot.SEGMENTS), material);
     this.mesh.position.set(pos.x, pos.y, pos.z);
 
+    // Update mesh position as well
     this.pos = pos;
-    this.vel = vel;
   }
 }
 
@@ -57,7 +66,7 @@ export class Asteroid extends Entity {
   private static readonly SEGMENTS = 50;
 
   constructor(public radius: number, public color: number, pos: Vector3, vel: Vector3) {
-    super();
+    super(pos, vel);
     const tex = sphereTextures[Math.floor(Math.random() * sphereTextures.length)];
     const material = new MeshStandardMaterial({
       color,
@@ -68,8 +77,8 @@ export class Asteroid extends Entity {
     this.mesh = new Mesh(new SphereGeometry(radius, Asteroid.SEGMENTS, Asteroid.SEGMENTS), material);
     this.mesh.position.set(pos.x, pos.y, pos.z);
 
+    // Update mesh position as well
     this.pos = pos;
-    this.vel = vel;
   }
 
   public split(): [Asteroid, Asteroid] {
@@ -100,9 +109,9 @@ export class Asteroid extends Entity {
     const m0 = this.radius ** 3;
     const v0Mag = this.vel.length();
     const v1Mag = m0 * v0Mag * Math.sin(t2) /
-                  (m1 * (Math.cos(t2) * Math.sin(t1) + Math.cos(t1) * Math.sin(t2)));
+      (m1 * (Math.cos(t2) * Math.sin(t1) + Math.cos(t1) * Math.sin(t2)));
     const v2Mag = m0 * v0Mag * (1 / Math.cos(t2)) * Math.sin(t1) /
-                  (m2 * (Math.sin(t1) + Math.cos(t1) * Math.tan(t2)));
+      (m2 * (Math.sin(t1) + Math.cos(t1) * Math.tan(t2)));
 
     // Need to rotate by an axis perpendicular to original velocity
     const axisX = Math.random();
