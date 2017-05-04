@@ -14,6 +14,9 @@ Python image manipulation library, and
 [noise](https://pypi.python.org/pypi/noise/), a Python Perlin noise library.
 
 ## Running
+If you cloned this from the GitHub repo, you'll need to build first. Run
+`npm run build`.
+
 Start a new server (e.g. in Python 3, `python3 -m http.server 8000 &>
 /dev/null`) and go to `localhost:8000` on your browser.
 
