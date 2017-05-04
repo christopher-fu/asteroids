@@ -1,6 +1,6 @@
 import {
   Scene, PerspectiveCamera, WebGLRenderer, Mesh, MeshLambertMaterial,
-  PointLight, Vector3, Geometry, Face3, DoubleSide, DirectionalLight,
+  Vector3, Geometry, Face3, DoubleSide, DirectionalLight,
   FaceColors, Box3, AmbientLight
 } from 'three';
 import Stats = require('stats.js');
@@ -11,7 +11,7 @@ class App {
   // STATIC CONSTANTS
   private static readonly WIDTH = 1024;
   private static readonly HEIGHT = 768;
-  private static readonly DRAW_DISTANCE = 100;
+  private static readonly DRAW_DISTANCE = 150;
   private static readonly SPAWN_DISTANCE = 70;
 
   private static readonly KEY_W = 'KeyW';
@@ -147,7 +147,7 @@ class App {
       const ast = this.asteroids[i];
       // Remove if asteroid radius is small enough
       if (ast.pos.distanceTo(this.camera.position) >= App.DRAW_DISTANCE ||
-          ast.radius < this.asteroidMinRadius) {
+        ast.radius < this.asteroidMinRadius) {
         this.asteroids.splice(i, 1);
         this.asteroidKdt.remove(ast);
         this.scene.remove(ast.mesh);
