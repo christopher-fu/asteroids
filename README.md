@@ -7,7 +7,7 @@ asteroids, which he must avoid and destroy using the gun on his ship.
 
 Asteroids is written in TypeScript, a statically typed, class-based,
 compile-to-JavaScript language. Its only external dependencies are
-[three.js](https://threejs.org/), a JavaScript 3D library, and
+[three.js](https://threejs.org/), a JavaScript 3D library,
 [kd-tree-javascript](https://github.com/ubilabs/kd-tree-javascript), a
 Javascript k-d tree implementation, [Pillow](https://python-pillow.org/), a
 Python image manipulation library, and
@@ -45,13 +45,13 @@ and remove objects from the scene if they are far away enough. We'll go over
 some challenging features below.
 
 ### Collision detection
-Asteroid objects are maintained in a kd-tree. Each loop, we check for collisions
-between shots and asteroids, and the spaceship and asteroids, by querying the
-kd-tree for the 10 nearest neighboring asteroids and checking if any of the
-asteroids' bounding boxes intersect with the shot's or spaceship's bounding box.
-If so, a collision has occurred, and the appropriate action is taken. If the
-object is a shot, the asteroid is split into two smaller asteroids. If the
-object is the spaceship, the game ends.
+Asteroid objects are maintained in a kd-tree. In each loop, we check for
+collisions between shots and asteroids, and the spaceship and asteroids, by
+querying the kd-tree for the 10 nearest neighboring asteroids and checking if
+any of the asteroids' bounding boxes intersect with the shot's or spaceship's
+bounding box. If so, a collision has occurred, and the appropriate action is
+taken. If the object is a shot, the asteroid is split into two smaller
+asteroids. If the object is the spaceship, the game ends.
 
 ### Asteroid splitting
 When an asteroid is struck by a shot, it is split into two smaller asteroids.
