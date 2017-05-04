@@ -19,7 +19,7 @@
     "webpack": "^2.4.1"
   },
   "dependencies": {
-    "k-d-tree": "^1.0.1",
+    "k-d-tree": "file:kd-tree-javascript",
     "stats.js": "^0.17.0",
     "three": "^0.85.2"
   }
