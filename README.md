@@ -45,9 +45,9 @@ and remove objects from the scene if they are far away enough. We'll go over
 some challenging features below.
 
 ### Collision detection
-Asteroid objects are maintained in a kd-tree. In each loop, we check for
+Asteroid objects are maintained in a k-d tree. In each loop, we check for
 collisions between shots and asteroids, and the spaceship and asteroids, by
-querying the kd-tree for the 10 nearest neighboring asteroids and checking if
+querying the k-d tree for the 10 nearest neighboring asteroids and checking if
 any of the asteroids' bounding boxes intersect with the shot's or spaceship's
 bounding box. If so, a collision has occurred, and the appropriate action is
 taken. If the object is a shot, the asteroid is split into two smaller
